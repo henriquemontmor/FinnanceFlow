@@ -1,0 +1,60 @@
+# ==========================================
+# Arquivos Sensíveis (NÃO COMMITAR)
+# ==========================================
+
+# Arquivos com credenciais e URLs reais
+appscript/Code.gs
+js/config.js
+
+# Credenciais e secrets
+*credentials*
+*secrets*
+*.key
+*.pem
+
+# ==========================================
+# Editor e Sistema
+# ==========================================
+
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*~
+
+# ==========================================
+# Logs e Temporários
+# ==========================================
+
+*.log
+*.tmp
+*.temp
+*.bak
+*.backup
+.cache/
+
+# ==========================================
+# Dependências
+# ==========================================
+
+node_modules/
+package-lock.json
+yarn.lock
+
+# ==========================================
+# Build e Environment
+# ==========================================
+
+dist/
+build/
+.env*
+coverage/
+.nyc_output/
+
+# Personal notes
+notes.md
+TODO.md
+PRIVATE.md

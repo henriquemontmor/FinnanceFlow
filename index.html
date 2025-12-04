@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="FinnanceFlow - Organize as finanças do seu casal de forma simples e eficiente"
+    />
+    <title>FinnanceFlow - Login</title>
+    <link rel="stylesheet" href="css/styles.css" />
+    <link rel="stylesheet" href="css/login.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="login-card">
+        <div class="logo">
+          <h1>💰 FinnanceFlow</h1>
+          <p class="tagline">Finanças do casal, organizadas</p>
+        </div>
+
+        <form id="loginForm" class="login-form">
+          <div class="form-group">
+            <label for="username">Usuário</label>
+            <input
+              type="text"
+              id="username"
+              name="username"
+              placeholder="Digite seu usuário"
+              required
+              autocomplete="username"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="password">Senha</label>
+            <input
+              type="password"
+              id="password"
+              name="password"
+              placeholder="Digite sua senha"
+              required
+              autocomplete="current-password"
+            />
+          </div>
+
+          <button type="submit" class="btn btn-primary">
+            <span class="btn-text">Entrar</span>
+            <span class="btn-loader" style="display: none">⏳</span>
+          </button>
+
+          <div
+            id="errorMessage"
+            class="error-message"
+            style="display: none"
+          ></div>
+        </form>
+
+        <div class="footer-links">
+          <a href="docs/SETUP.md" target="_blank">Como configurar</a>
+          <span>•</span>
+          <a href="https://github.com/seu-usuario/FinnanceFlow" target="_blank"
+            >GitHub</a
+          >
+        </div>
+      </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/login.js"></script>
+  </body>
+</html>

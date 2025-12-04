@@ -1,0 +1,48 @@
+// ==========================================
+// FinnanceFlow - Configuration
+// ==========================================
+//
+// 📋 INSTRUÇÕES DE CONFIGURAÇÃO:
+// 1. Copie este arquivo para "config.js"
+// 2. Substitua API_URL pela URL do seu Google Apps Script implantado
+// 3. Personalize os nomes das pessoas se desejar (opcional)
+//
+// ⚠️ IMPORTANTE: Nunca commite o arquivo config.js real com sua API_URL!
+// ==========================================
+
+const CONFIG = {
+  // ==========================================
+  // 🌐 URL DA API DO GOOGLE APPS SCRIPT
+  // ==========================================
+  // ⚠️ SUBSTITUA com a URL do seu Apps Script implantado
+  // Obtenha em: Implantar > Gerenciar implantações > URL da implantação
+  API_URL:
+    "https://script.google.com/macros/s/SEU_SCRIPT_ID_AQUI/exec",
+
+  // App Settings
+  APP_NAME: "FinnanceFlow",
+  VERSION: "1.0.0",
+
+  // Local Storage Keys
+  STORAGE_KEYS: {
+    TOKEN: "ff_auth_token",
+    USER_DATA: "ff_user_data",
+    CURRENT_VIEW: "ff_current_view",
+  },
+
+  // Person Names (customize these) - OPCIONAL
+  // Estes nomes são apenas para exibição, os nomes reais vêm do Apps Script
+  PERSON_NAMES: {
+    pessoa1: "Pessoa 1",
+    pessoa2: "Pessoa 2",
+  },
+
+  // Default Settings
+  CURRENCY: "BRL",
+  LOCALE: "pt-BR",
+};
+
+// Freeze configuration to prevent modifications
+Object.freeze(CONFIG);
+Object.freeze(CONFIG.STORAGE_KEYS);
+Object.freeze(CONFIG.PERSON_NAMES);
