@@ -46,6 +46,7 @@ const CONFIG = {
     "https://localhost:5500",
     
     // ⚠️ SUBSTITUA com seu domínio real do GitHub Pages
+    // Exemplo: "https://seu-usuario.github.io",
     "https://seu-usuario.github.io",
   ],
 };
@@ -68,18 +69,12 @@ function doGet(e) {
 
 // Handle CORS preflight requests (OPTIONS method)
 function doOptions(e) {
-  const origin = e.parameter.origin || (e.headers && e.headers.origin);
-
-  // Check if origin is allowed
-  if (origin && isOriginAllowed(origin)) {
-    return ContentService.createTextOutput("").setMimeType(
-      ContentService.MimeType.TEXT
-    );
-  }
-
-  return ContentService.createTextOutput("").setMimeType(
-    ContentService.MimeType.TEXT
-  );
+  return ContentService.createTextOutput('')
+    .setMimeType(ContentService.MimeType.TEXT)
+    .setHeader('Access-Control-Allow-Origin', '*')
+    .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+    .setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+    .setHeader('Access-Control-Max-Age', '86400');
 }
 
 function doPost(e) {
