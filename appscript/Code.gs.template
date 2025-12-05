@@ -976,7 +976,8 @@ function calculateInstallmentDate(purchaseDate, closingDay, installmentNumber) {
   const date = new Date(purchaseDate);
   const purchaseDay = date.getDate();
 
-  // If purchase is after closing day, it goes to next month's invoice
+  // If purchase is after closing day, first installment goes to next month's invoice
+  // Then subsequent installments follow monthly
   let monthsToAdd = installmentNumber;
   if (purchaseDay > closingDay) {
     monthsToAdd += 1;
@@ -1008,7 +1009,13 @@ function createInstallmentTransactions(data, card) {
     const now = new Date().toISOString();
     const dueDate = calculateInstallmentDate(data.dueDate, card.closingDay, i);
 
-    const description = `${data.description} (${i + 1}/${installments})`;
+    // Add label: à vista for single payment, or installment number
+    let description;
+    if (installments === 1) {
+      description = `${data.description} (à vista)`;
+    } else {
+      description = `${data.description} (${i + 1}/${installments})`;
+    }
 
     sheet.appendRow([
       id,
