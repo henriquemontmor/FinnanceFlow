@@ -487,6 +487,50 @@ function createTransaction(data) {
   const now = new Date();
   const isRecurring = data.isRecurring || false;
 
+  // Handle card transactions (credit card - needs invoice assignment)
+  let invoiceId = data.invoiceId || null;
+  if (data.type === "cartao" && data.cardId && data.cardTransactionType === "credit") {
+    // Get card information
+    const cardsSheet = getCardsSheet();
+    const cardRow = findRowById(cardsSheet, data.cardId);
+
+    if (cardRow !== -1) {
+      const cardValues = cardsSheet.getRange(cardRow, 1, 1, 6).getValues()[0];
+      const card = {
+        id: cardValues[0],
+        closingDay: cardValues[3],
+        dueDay: cardValues[2],
+      };
+
+      // Determine which invoice this purchase belongs to
+      const purchaseDate = new Date(data.dueDate);
+      const purchaseDay = purchaseDate.getDate();
+      const purchaseMonth = purchaseDate.getMonth() + 1;
+      const purchaseYear = purchaseDate.getFullYear();
+
+      let targetMonth = purchaseMonth;
+      let targetYear = purchaseYear;
+
+      // If purchase is after closing day, it goes to next month's invoice
+      if (purchaseDay > card.closingDay) {
+        targetMonth += 1;
+        if (targetMonth > 12) {
+          targetMonth = 1;
+          targetYear += 1;
+        }
+      }
+
+      // Find or create invoice for target month/year
+      invoiceId = findOrCreateInvoice(
+        card.id,
+        targetMonth,
+        targetYear,
+        card.closingDay,
+        card.dueDay
+      );
+    }
+  }
+
   const row = [
     id,
     data.description,
@@ -500,15 +544,20 @@ function createTransaction(data) {
     isRecurring,
     now,
     now,
-    null, // cardId
+    data.cardId || null, // cardId
     null, // currentInstallment
     null, // totalInstallments
     false, // isTransfer
     data.cardTransactionType || null, // debit or credit
-    data.invoiceId || null, // invoiceId
+    invoiceId, // invoiceId (auto-assigned for credit cards)
   ];
 
   sheet.appendRow(row);
+
+  // Update invoice total if card transaction was linked to invoice
+  if (invoiceId && data.type === "cartao" && data.cardTransactionType === "credit") {
+    updateInvoice({ id: invoiceId });
+  }
 
   // Check if category is a user name (transfer between users)
   const categoryLower = (data.category || "").toLowerCase();
@@ -723,35 +772,25 @@ function getSummary(data) {
   transactions.forEach((t) => {
     // Transferências: não contam como receita/despesa, apenas ajustam saldo
     if (t.isTransfer || t.type === "transfer") {
-      // Transfers affect balance but don't count as income/expense
       return;
     }
 
-    // Cartão débito: remove do saldo como despesa normal
-    if (t.type === "cartao" && t.cardTransactionType === "debit") {
-      summary.totalExpense += t.amount;
-      if (t.status === "pending") {
-        summary.totalPending += t.amount;
+    // CARTÃO
+    if (t.type === "cartao") {
+      // DÉBITO: diminui do saldo (como despesa normal), NÃO aparece em totalCard
+      if (t.cardTransactionType === "debit") {
+        summary.totalExpense += t.amount;
+        if (t.status === "pending") {
+          summary.totalPending += t.amount;
+        }
       }
-      return;
-    }
+      // CRÉDITO: não afeta o saldo, APENAS aparece em totalCard
+      else if (t.cardTransactionType === "credit") {
+        summary.totalCard += t.amount;
+      }
 
-    // Cartão crédito: NUNCA entra em despesas ou pendentes gerais
-    // Apenas soma no totalCard (separado)
-    if (t.type === "cartao" && t.cardTransactionType === "credit") {
-      summary.totalCard += t.amount;
-      // NÃO adiciona em totalPending - cartão tem seu próprio contador
       return;
-    }
-
-    // Cartão sem tipo especificado (retrocompatibilidade) - trata como crédito
-    if (t.type === "cartao" && !t.cardTransactionType) {
-      summary.totalCard += t.amount;
-      // NÃO adiciona em totalPending - cartão tem seu próprio contador
-      return;
-    }
-
-    // Caixinha: adiciona ao guardado
+    }    // Caixinha: adiciona ao guardado
     if (t.type === "caixinha") {
       summary.totalSavings += t.amount;
       return;
@@ -1281,7 +1320,9 @@ function calculateInstallmentDate(purchaseDate, closingDay, dueDay, installmentN
   date.setDate(dueDay);
 
   return Utilities.formatDate(date, Session.getScriptTimeZone(), "yyyy-MM-dd");
-}/**
+}
+
+/**
  * Create installment transactions
  * @param {object} data - Transaction data with installment info
  * @param {object} card - Card data with closing day
@@ -1292,11 +1333,32 @@ function createInstallmentTransactions(data, card) {
   const installments = data.installments;
   const amountPerInstallment = data.amount / installments;
   const createdIds = [];
+  const invoicesSheet = getInvoicesSheet();
+  const invoicesCreated = new Set();
 
   for (let i = 0; i < installments; i++) {
     const id = Utilities.getUuid();
     const now = new Date().toISOString();
-    const dueDate = calculateInstallmentDate(data.dueDate, card.closingDay, card.dueDay, i);
+    const dueDate = calculateInstallmentDate(
+      data.dueDate,
+      card.closingDay,
+      card.dueDay,
+      i
+    );
+
+    // Parse due date to get month/year for invoice
+    const dueDateObj = new Date(dueDate);
+    const invoiceMonth = dueDateObj.getMonth() + 1;
+    const invoiceYear = dueDateObj.getFullYear();
+
+    // Create or find invoice for this month/year
+    let invoiceId = findOrCreateInvoice(
+      card.id,
+      invoiceMonth,
+      invoiceYear,
+      card.closingDay,
+      card.dueDay
+    );
 
     // Add label: à vista for single payment, or installment number
     let description;
@@ -1304,12 +1366,6 @@ function createInstallmentTransactions(data, card) {
       description = `${data.description} (à vista)`;
     } else {
       description = `${data.description} (${i + 1}/${installments})`;
-    }
-
-    // Determine invoice if credit card and invoiceId provided
-    let invoiceId = null;
-    if (data.cardTransactionType === "credit" && data.invoiceId) {
-      invoiceId = data.invoiceId;
     }
 
     sheet.appendRow([
@@ -1334,12 +1390,64 @@ function createInstallmentTransactions(data, card) {
     ]);
 
     createdIds.push(id);
+    invoicesCreated.add(invoiceId);
   }
 
-  // Update invoice total if invoiceId specified
-  if (data.invoiceId) {
-    updateInvoice({ id: data.invoiceId });
-  }
+  // Update totals for all affected invoices
+  invoicesCreated.forEach((invoiceId) => {
+    updateInvoice({ id: invoiceId });
+  });
 
   return createdIds;
+}
+
+/**
+ * Find existing invoice or create new one for specific month/year
+ * @param {string} cardId - Card ID
+ * @param {number} month - Month (1-12)
+ * @param {number} year - Year
+ * @param {number} closingDay - Card closing day
+ * @param {number} dueDay - Card due day
+ * @returns {string} Invoice ID
+ */
+function findOrCreateInvoice(cardId, month, year, closingDay, dueDay) {
+  const sheet = getInvoicesSheet();
+  const lastRow = sheet.getLastRow();
+
+  // Search for existing invoice
+  if (lastRow >= 2) {
+    const invoices = sheet.getRange(2, 1, lastRow - 1, 9).getValues();
+
+    for (let i = 0; i < invoices.length; i++) {
+      const invoice = invoices[i];
+      // Check if invoice exists for this card/month/year
+      if (
+        invoice[1] === cardId &&
+        invoice[2] === month &&
+        invoice[3] === year
+      ) {
+        return invoice[0]; // Return existing invoice ID
+      }
+    }
+  }
+
+  // Create new invoice if not found
+  const id = Utilities.getUuid();
+  const now = new Date().toISOString();
+  const closingDate = new Date(year, month - 1, closingDay);
+  const dueDate = new Date(year, month - 1, dueDay);
+
+  sheet.appendRow([
+    id,
+    cardId,
+    month,
+    year,
+    closingDate,
+    dueDate,
+    0, // Initial total amount
+    "open", // Status: open
+    now,
+  ]);
+
+  return id;
 }

@@ -750,7 +750,22 @@ function openModal(type = "expense") {
   // Reset checkboxes
   document.getElementById("isInstallment").checked = false;
   document.getElementById("isRecurring").checked = false;
-  document.getElementById("installmentFields").style.display = "none";
+
+  // Installment fields - show for cartao type, hide for others
+  const installmentFields = document.getElementById("installmentFields");
+  if (installmentFields) {
+    if (type === "cartao") {
+      installmentFields.style.display = "block";
+      document.getElementById("cardId").required = true;
+      document.getElementById("cardTransactionType").required = true;
+      document.getElementById("installments").required = true;
+    } else {
+      installmentFields.style.display = "none";
+      document.getElementById("cardId").required = false;
+      document.getElementById("cardTransactionType").required = false;
+      document.getElementById("installments").required = false;
+    }
+  }
 
   // Populate categories based on type
   populateCategories(type);
@@ -808,6 +823,7 @@ async function handleFormSubmit(e) {
   const id = formData.get("id");
   const transactionType = formData.get("type");
   const isExpense = transactionType === "expense";
+  const isCartao = transactionType === "cartao";
   const isInstallment = document.getElementById("isInstallment").checked;
 
   const transactionData = {
@@ -815,23 +831,23 @@ async function handleFormSubmit(e) {
     amount: parseFloat(formData.get("amount")),
     type: transactionType,
     // For income: always current user and paid
-    // For expense: use form values
-    person: isExpense ? formData.get("person") : currentUsername,
+    // For expense/cartao: use form values
+    person: isExpense || isCartao ? formData.get("person") : currentUsername,
     category: formData.get("category"),
     dueDate: formData.get("dueDate"),
-    status: isExpense ? formData.get("status") : "paid",
+    status: isExpense || isCartao ? formData.get("status") : "paid",
     notes: formData.get("notes"),
     isRecurring: isExpense
       ? document.getElementById("isRecurring").checked
       : false,
   };
 
-  // Add installment data if checked
-  if (isInstallment && !id && isExpense) {
-    transactionData.installments = parseInt(formData.get("installments"));
+  // Add card data for "cartao" type or installment expenses
+  if ((isCartao || isInstallment) && !id) {
     transactionData.cardId = formData.get("cardId");
     transactionData.cardTransactionType = formData.get("cardTransactionType");
     transactionData.invoiceId = formData.get("invoiceId") || null;
+    transactionData.installments = parseInt(formData.get("installments")) || 1;
 
     if (!transactionData.cardId) {
       showError("Por favor, selecione um cartão.");
@@ -849,6 +865,11 @@ async function handleFormSubmit(e) {
       showError("Número de parcelas deve ser maior ou igual a 1.");
       return;
     }
+
+    // For "cartao" type, always mark as needing installment processing
+    if (isCartao && transactionData.installments >= 1) {
+      // Backend will handle installment creation
+    }
   }
 
   try {
@@ -861,9 +882,11 @@ async function handleFormSubmit(e) {
       showSuccess("Transação atualizada!");
     } else {
       await API.createTransaction(transactionData);
-      // Show brief success message only for installments
-      if (isInstallment && isExpense) {
+      // Show brief success message for card transactions
+      if ((isCartao || isInstallment) && transactionData.installments > 1) {
         showSuccess(`${transactionData.installments} parcelas criadas! 💳`);
+      } else if (isCartao) {
+        showSuccess("Despesa de cartão criada! 💳");
       }
     }
 
