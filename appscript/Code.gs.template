@@ -966,19 +966,21 @@ function deleteCard(data) {
 // ==========================================
 
 /**
- * Calculate the due date for an installment based on card's closing day
+ * Calculate the due date for an installment based on card's closing and due days
  * @param {Date} purchaseDate - Date of purchase
  * @param {number} closingDay - Day of month when card closes
+ * @param {number} dueDay - Day of month when invoice is due
  * @param {number} installmentNumber - Which installment (0-based)
  * @returns {string} Due date in YYYY-MM-DD format
  */
-function calculateInstallmentDate(purchaseDate, closingDay, installmentNumber) {
+function calculateInstallmentDate(purchaseDate, closingDay, dueDay, installmentNumber) {
   const date = new Date(purchaseDate);
   const purchaseDay = date.getDate();
 
-  // If purchase is after closing day, first installment goes to next month's invoice
-  // Then subsequent installments follow monthly
+  // Calculate months to add based on installment number
   let monthsToAdd = installmentNumber;
+
+  // If purchase is after closing day, ALL installments start from next month's invoice
   if (purchaseDay > closingDay) {
     monthsToAdd += 1;
   }
@@ -986,13 +988,11 @@ function calculateInstallmentDate(purchaseDate, closingDay, installmentNumber) {
   // Add months
   date.setMonth(date.getMonth() + monthsToAdd);
 
-  // Set to closing day
-  date.setDate(closingDay);
+  // Set to invoice due day (not closing day)
+  date.setDate(dueDay);
 
   return Utilities.formatDate(date, Session.getScriptTimeZone(), "yyyy-MM-dd");
-}
-
-/**
+}/**
  * Create installment transactions
  * @param {object} data - Transaction data with installment info
  * @param {object} card - Card data with closing day
@@ -1007,7 +1007,7 @@ function createInstallmentTransactions(data, card) {
   for (let i = 0; i < installments; i++) {
     const id = Utilities.getUuid();
     const now = new Date().toISOString();
-    const dueDate = calculateInstallmentDate(data.dueDate, card.closingDay, i);
+    const dueDate = calculateInstallmentDate(data.dueDate, card.closingDay, card.dueDay, i);
 
     // Add label: à vista for single payment, or installment number
     let description;
