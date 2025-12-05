@@ -215,6 +215,14 @@ function initializeEventListeners() {
     });
   }
 
+  // Reset installment checkbox state when opening modal
+  const newTransactionBtn = document.getElementById("newTransactionBtn");
+  if (newTransactionBtn && isInstallmentCheckbox) {
+    newTransactionBtn.addEventListener("click", () => {
+      isInstallmentCheckbox.disabled = false;
+    });
+  }
+
   // Filter
   if (filterStatus) {
     filterStatus.addEventListener("change", () => {
@@ -338,8 +346,21 @@ function renderTransactions() {
     filtered = transactions.filter((t) => t.status === currentFilter);
   }
 
-  // Sort by date (most recent first)
-  filtered.sort((a, b) => new Date(b.dueDate) - new Date(a.dueDate));
+  // Custom sort: pending (oldest first), then paid (most recently updated first)
+  filtered.sort((a, b) => {
+    // Priority 1: Pending transactions come first
+    if (a.status === "pending" && b.status !== "pending") return -1;
+    if (a.status !== "pending" && b.status === "pending") return 1;
+
+    // Priority 2: Within each group, sort by appropriate date
+    if (a.status === "pending" && b.status === "pending") {
+      // Pending: oldest first (by due date)
+      return new Date(a.dueDate) - new Date(b.dueDate);
+    } else {
+      // Paid: most recently updated first
+      return new Date(b.updatedAt) - new Date(a.updatedAt);
+    }
+  });
 
   if (filtered.length === 0) {
     transactionsList.innerHTML = `
@@ -458,10 +479,6 @@ function attachTransactionEventListeners() {
 // ==========================================
 
 async function handleMarkAsPaid(id) {
-  if (!confirm("Marcar esta transação como paga?")) {
-    return;
-  }
-
   try {
     await API.markAsPaid(id);
     await loadDashboardData();
@@ -492,10 +509,6 @@ async function handleEdit(id) {
 }
 
 async function handleDelete(id) {
-  if (!confirm("Tem certeza que deseja excluir esta transação?")) {
-    return;
-  }
-
   try {
     await API.deleteTransaction(id);
     await loadDashboardData();

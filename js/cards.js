@@ -149,10 +149,6 @@ async function handleEdit(id) {
 }
 
 async function handleDelete(id) {
-  if (!confirm("Tem certeza que deseja excluir este cartão?")) {
-    return;
-  }
-
   try {
     await API.deleteCard(id);
     await loadCards();
