@@ -1,0 +1,52 @@
+// Cloudflare Worker para fazer proxy da API do Google Apps Script
+// Deploy em: https://dash.cloudflare.com → Workers → Create Service
+
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/SEU_SCRIPT_ID_AQUI/exec';
+
+addEventListener('fetch', event => {
+  event.respondWith(handleRequest(event.request))
+})
+
+async function handleRequest(request) {
+  // Handle CORS preflight
+  if (request.method === 'OPTIONS') {
+    return new Response(null, {
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Max-Age': '86400',
+      }
+    })
+  }
+
+  // Parse URL
+  const url = new URL(request.url);
+  const action = url.searchParams.get('action');
+  
+  // Build Apps Script URL
+  const appsScriptUrl = action 
+    ? `${APPS_SCRIPT_URL}?action=${action}`
+    : APPS_SCRIPT_URL;
+
+  // Forward request
+  const response = await fetch(appsScriptUrl, {
+    method: request.method,
+    headers: request.headers,
+    body: request.method !== 'GET' ? await request.text() : undefined
+  });
+
+  // Get response
+  const data = await response.text();
+
+  // Return with CORS headers
+  return new Response(data, {
+    status: response.status,
+    headers: {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    }
+  });
+}

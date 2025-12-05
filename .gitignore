@@ -5,6 +5,7 @@
 # Arquivos com credenciais e URLs reais
 appscript/Code.gs
 js/config.js
+cloudflare-worker.js
 
 # Credenciais e secrets
 *credentials*
