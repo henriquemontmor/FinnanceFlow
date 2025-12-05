@@ -17,11 +17,6 @@ const CONFIG = {
   // Substitua com a URL do seu Cloudflare Worker
   // Exemplo: "https://finnanceflow-api.seu-usuario.workers.dev"
   API_URL: "https://seu-worker.workers.dev",
-  // ==========================================
-  // ⚠️ SUBSTITUA com a URL do seu Apps Script implantado
-  // Obtenha em: Implantar > Gerenciar implantações > URL da implantação
-  API_URL:
-    "https://script.google.com/macros/s/SEU_SCRIPT_ID_AQUI/exec",
 
   // App Settings
   APP_NAME: "FinnanceFlow",
