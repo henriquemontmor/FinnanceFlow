@@ -73,24 +73,6 @@
   }
 }
 
-.footer-links {
-  text-align: center;
-  padding-top: var(--spacing-lg);
-  border-top: 1px solid var(--border-color);
-  font-size: 0.875rem;
-  color: var(--text-muted);
-}
-
-.footer-links a {
-  color: var(--primary-color);
-  font-weight: 500;
-}
-
-.footer-links span {
-  margin: 0 var(--spacing-sm);
-  color: var(--border-color);
-}
-
 /* Responsive */
 @media (max-width: 480px) {
   .login-card {
