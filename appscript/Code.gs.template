@@ -682,9 +682,34 @@ function getSummary(data) {
     totalIncome: 0,
     totalExpense: 0,
     totalPending: 0,
+    totalCard: 0,
+    totalCardPending: 0,
+    totalSavings: 0,
   };
 
   transactions.forEach((t) => {
+    // Cartão: separado, não entra nos totais principais
+    if (t.type === "cartao") {
+      summary.totalCard += t.amount;
+      if (t.status === "pending") {
+        summary.totalCardPending += t.amount;
+      }
+      return;
+    }
+
+    // Caixinha: adiciona ao guardado
+    if (t.type === "caixinha") {
+      summary.totalSavings += t.amount;
+      return;
+    }
+
+    // Retirada da caixinha: subtrai do guardado
+    if (t.type === "retirada-caixinha") {
+      summary.totalSavings -= t.amount;
+      return;
+    }
+
+    // Transações normais (income/expense)
     if (t.type === "income") {
       summary.totalIncome += t.amount;
     } else if (t.type === "expense") {

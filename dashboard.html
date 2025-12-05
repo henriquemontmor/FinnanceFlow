@@ -63,6 +63,22 @@
             <p class="card-value" id="balance">R$ 0,00</p>
           </div>
         </div>
+
+        <div class="summary-card card-credit">
+          <div class="card-icon">💳</div>
+          <div class="card-content">
+            <h3>Cartão</h3>
+            <p class="card-value" id="totalCard">R$ 0,00</p>
+          </div>
+        </div>
+
+        <div class="summary-card card-savings">
+          <div class="card-icon">🐷</div>
+          <div class="card-content">
+            <h3>Guardado</h3>
+            <p class="card-value" id="totalSavings">R$ 0,00</p>
+          </div>
+        </div>
       </div>
 
       <!-- Month/Year Filter -->
@@ -76,6 +92,15 @@
         <button class="btn btn-primary" id="addExpenseBtn">
           <span>➕</span> Nova Despesa
         </button>
+        <button class="btn btn-secondary" id="addCardBtn">
+          <span>💳</span> Cartão
+        </button>
+        <button class="btn btn-info" id="addSavingsBtn">
+          <span>🐷</span> Guardar
+        </button>
+        <button class="btn btn-warning" id="withdrawSavingsBtn">
+          <span>📤</span> Retirar
+        </button>
       </div>
 
       <!-- Transactions List -->
@@ -86,6 +111,14 @@
             <option value="all">Todas</option>
             <option value="pending">Pendentes</option>
             <option value="paid">Pagas</option>
+          </select>
+          <select id="filterType" class="filter-select">
+            <option value="all">Todos os Tipos</option>
+            <option value="income">Receitas</option>
+            <option value="expense">Despesas</option>
+            <option value="cartao">Cartão</option>
+            <option value="caixinha">Caixinha</option>
+            <option value="retirada-caixinha">Retirada</option>
           </select>
         </div>
 

@@ -30,6 +30,7 @@ let currentView =
   localStorage.getItem(CONFIG.STORAGE_KEYS.CURRENT_VIEW) || currentUsername;
 let transactions = [];
 let currentFilter = "all";
+let currentTypeFilter = "all";
 
 // DOM Elements
 const logoutBtn = document.getElementById("logoutBtn");
@@ -48,6 +49,8 @@ const totalIncomeEl = document.getElementById("totalIncome");
 const totalExpenseEl = document.getElementById("totalExpense");
 const totalPendingEl = document.getElementById("totalPending");
 const balanceEl = document.getElementById("balance");
+const totalCardEl = document.getElementById("totalCard");
+const totalSavingsEl = document.getElementById("totalSavings");
 
 // ==========================================
 // Initialization
@@ -187,6 +190,27 @@ function initializeEventListeners() {
     });
   }
 
+  const addCardBtn = document.getElementById("addCardBtn");
+  if (addCardBtn) {
+    addCardBtn.addEventListener("click", () => {
+      openModal("cartao");
+    });
+  }
+
+  const addSavingsBtn = document.getElementById("addSavingsBtn");
+  if (addSavingsBtn) {
+    addSavingsBtn.addEventListener("click", () => {
+      openModal("caixinha");
+    });
+  }
+
+  const withdrawSavingsBtn = document.getElementById("withdrawSavingsBtn");
+  if (withdrawSavingsBtn) {
+    withdrawSavingsBtn.addEventListener("click", () => {
+      openModal("retirada-caixinha");
+    });
+  }
+
   // Installment checkbox toggle
   const isInstallmentCheckbox = document.getElementById("isInstallment");
   const installmentFields = document.getElementById("installmentFields");
@@ -242,6 +266,14 @@ function initializeEventListeners() {
   if (filterStatus) {
     filterStatus.addEventListener("change", () => {
       currentFilter = filterStatus.value;
+      renderTransactions();
+    });
+  }
+
+  const filterType = document.getElementById("filterType");
+  if (filterType) {
+    filterType.addEventListener("change", () => {
+      currentTypeFilter = filterType.value;
       renderTransactions();
     });
   }
@@ -337,6 +369,8 @@ function updateSummary(data) {
   totalIncomeEl.textContent = formatCurrency(data.totalIncome || 0);
   totalExpenseEl.textContent = formatCurrency(data.totalExpense || 0);
   totalPendingEl.textContent = formatCurrency(data.totalPending || 0);
+  totalCardEl.textContent = formatCurrency(data.totalCard || 0);
+  totalSavingsEl.textContent = formatCurrency(data.totalSavings || 0);
 
   const balance = (data.totalIncome || 0) - (data.totalExpense || 0);
   balanceEl.textContent = formatCurrency(balance);
@@ -346,6 +380,24 @@ function updateSummary(data) {
     balanceEl.style.color = "var(--success-color)";
   } else {
     balanceEl.style.color = "var(--danger-color)";
+  }
+
+  // Color card based on value
+  if (totalCardEl) {
+    if ((data.totalCard || 0) > 0) {
+      totalCardEl.style.color = "var(--danger-color)";
+    } else {
+      totalCardEl.style.color = "var(--text-color)";
+    }
+  }
+
+  // Color savings based on value
+  if (totalSavingsEl) {
+    if ((data.totalSavings || 0) > 0) {
+      totalSavingsEl.style.color = "var(--success-color)";
+    } else {
+      totalSavingsEl.style.color = "var(--text-color)";
+    }
   }
 }
 
@@ -358,7 +410,11 @@ function renderTransactions() {
   let filtered = transactions;
 
   if (currentFilter !== "all") {
-    filtered = transactions.filter((t) => t.status === currentFilter);
+    filtered = filtered.filter((t) => t.status === currentFilter);
+  }
+
+  if (currentTypeFilter !== "all") {
+    filtered = filtered.filter((t) => t.type === currentTypeFilter);
   }
 
   // Custom sort: pending (oldest first), then paid (most recently updated first)
@@ -397,10 +453,19 @@ function renderTransactions() {
 }
 
 function createTransactionElement(transaction) {
-  const isIncome = transaction.type === "income";
-  const icon = isIncome ? "💵" : "💳";
-  const typeClass = isIncome ? "income" : "expense";
-  const amountPrefix = isIncome ? "+" : "-";
+  // Define icons and classes based on type
+  const typeConfig = {
+    income: { icon: "💵", class: "income", prefix: "+" },
+    expense: { icon: "💳", class: "expense", prefix: "-" },
+    cartao: { icon: "💳", class: "card", prefix: "-" },
+    caixinha: { icon: "🐷", class: "savings", prefix: "+" },
+    "retirada-caixinha": { icon: "📤", class: "withdraw", prefix: "-" },
+  };
+
+  const config = typeConfig[transaction.type] || typeConfig.expense;
+  const icon = config.icon;
+  const typeClass = config.class;
+  const amountPrefix = config.prefix;
 
   // Display person name - show username or "Compartilhado"
   const personName =
@@ -547,23 +612,42 @@ function openModal(type = "expense") {
   const today = new Date().toISOString().split("T")[0];
   document.getElementById("dueDate").value = today;
 
-  modalTitle.textContent = type === "expense" ? "Nova Despesa" : "Nova Receita";
+  // Set title based on type
+  const titles = {
+    expense: "Nova Despesa",
+    income: "Nova Receita",
+    cartao: "Gasto no Cartão",
+    caixinha: "Guardar Dinheiro",
+    "retirada-caixinha": "Retirar da Caixinha",
+  };
+  modalTitle.textContent = titles[type] || "Nova Transação";
 
   // Show/hide fields based on type
   const isExpense = type === "expense";
+  const isIncome = type === "income";
+  const isSpecialType = ["cartao", "caixinha", "retirada-caixinha"].includes(
+    type
+  );
 
-  // Person field - only for expenses
+  // Person field - only for expenses, cartao, caixinha
   const personGroup = document.getElementById("personGroup");
   if (personGroup) {
-    personGroup.style.display = isExpense ? "block" : "none";
-    document.getElementById("person").required = isExpense;
+    const needsPerson = [
+      "expense",
+      "cartao",
+      "caixinha",
+      "retirada-caixinha",
+    ].includes(type);
+    personGroup.style.display = needsPerson ? "block" : "none";
+    document.getElementById("person").required = needsPerson;
   }
 
-  // Status field - only for expenses (income is always "paid")
+  // Status field - hide for income and special types
   const statusGroup = document.getElementById("statusGroup");
   if (statusGroup) {
-    statusGroup.style.display = isExpense ? "block" : "none";
-    document.getElementById("status").required = isExpense;
+    statusGroup.style.display =
+      isExpense || type === "cartao" ? "block" : "none";
+    document.getElementById("status").required = isExpense || type === "cartao";
   }
 
   // Installment checkbox - only for expenses

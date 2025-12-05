@@ -76,6 +76,13 @@
   margin-bottom: var(--spacing-xl);
 }
 
+@media (max-width: 768px) {
+  .summary-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-sm);
+  }
+}
+
 .summary-card {
   background: var(--bg-primary);
   padding: var(--spacing-lg);
@@ -114,6 +121,12 @@
 }
 .card-balance .card-icon {
   background: #dbeafe;
+}
+.card-credit .card-icon {
+  background: #e9d5ff;
+}
+.card-savings .card-icon {
+  background: #fecaca;
 }
 
 .card-content {
@@ -336,7 +349,26 @@
 @media (max-width: 768px) {
   .summary-grid {
     grid-template-columns: repeat(2, 1fr);
-    gap: var(--spacing-md);
+    gap: var(--spacing-sm);
+  }
+
+  .summary-card {
+    padding: var(--spacing-sm);
+    gap: var(--spacing-sm);
+  }
+
+  .card-icon {
+    font-size: 1.5rem;
+    width: 40px;
+    height: 40px;
+  }
+
+  .card-content h3 {
+    font-size: 0.75rem;
+  }
+
+  .card-value {
+    font-size: 1rem;
   }
 
   .action-buttons {
