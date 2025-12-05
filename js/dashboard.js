@@ -498,7 +498,7 @@ function formatCurrency(value) {
 
 function formatDate(dateString) {
   const date = new Date(dateString + "T00:00:00");
-  return new Intl.DateFormat(CONFIG.LOCALE, {
+  return new window.Intl.DateFormat(CONFIG.LOCALE, {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
