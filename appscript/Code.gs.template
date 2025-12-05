@@ -16,6 +16,7 @@ const CONFIG = {
   SHEET_NAME: "Transacoes",
   TOKEN_SHEET: "Tokens",
   CARDS_SHEET: "Cartoes",
+  INVOICES_SHEET: "Faturas",
   
   // ==========================================
   // 🔐 CONFIGURE SEUS USUÁRIOS AQUI
@@ -111,6 +112,11 @@ function doPost(e) {
       case "createCard":
       case "updateCard":
       case "deleteCard":
+      case "getInvoices":
+      case "createInvoice":
+      case "updateInvoice":
+      case "deleteInvoice":
+      case "closeInvoice":
         // Validate token for protected routes
         const username = validateTokenAndGetUser(data.token);
         if (!username) {
@@ -132,6 +138,11 @@ function doPost(e) {
         if (action === "createCard") return createCard(data);
         if (action === "updateCard") return updateCard(data);
         if (action === "deleteCard") return deleteCard(data);
+        if (action === "getInvoices") return getInvoices(data);
+        if (action === "createInvoice") return createInvoice(data);
+        if (action === "updateInvoice") return updateInvoice(data);
+        if (action === "deleteInvoice") return deleteInvoice(data);
+        if (action === "closeInvoice") return closeInvoice(data);
         break;
 
       default:
@@ -322,6 +333,9 @@ function initializeSheet(sheet) {
     "ID Cartão",
     "Parcela Atual",
     "Total Parcelas",
+    "É Transferência",
+    "Tipo Cartão",
+    "ID Fatura",
   ];
 
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
@@ -345,7 +359,7 @@ function getTransactions(data) {
     });
   }
 
-  const range = sheet.getRange(2, 1, lastRow - 1, 15);
+  const range = sheet.getRange(2, 1, lastRow - 1, 18);
   const values = range.getValues();
 
   let transactions = values
@@ -365,6 +379,9 @@ function getTransactions(data) {
       cardId: row[12] || null,
       currentInstallment: row[13] || null,
       totalInstallments: row[14] || null,
+      isTransfer: row[15] || false,
+      cardTransactionType: row[16] || null,
+      invoiceId: row[17] || null,
     }))
     .filter((t) => t.id); // Filter out empty rows
 
@@ -387,10 +404,8 @@ function getTransactions(data) {
     // Show only shared transactions
     transactions = transactions.filter((t) => t.person === "shared");
   } else if (data.view === currentUser || !data.view) {
-    // Show user's own transactions + shared
-    transactions = transactions.filter(
-      (t) => t.person === currentUser || t.person === "shared"
-    );
+    // Show only user's own transactions (NOT shared)
+    transactions = transactions.filter((t) => t.person === currentUser);
   } else {
     // User trying to view someone else's data - return empty
     transactions = [];
@@ -411,7 +426,7 @@ function getTransaction(data) {
     return createResponse({ error: "Transaction not found" }, 404);
   }
 
-  const values = sheet.getRange(row, 1, 1, 15).getValues()[0];
+  const values = sheet.getRange(row, 1, 1, 18).getValues()[0];
 
   const transaction = {
     id: values[0],
@@ -429,6 +444,9 @@ function getTransaction(data) {
     cardId: values[12] || null,
     currentInstallment: values[13] || null,
     totalInstallments: values[14] || null,
+    isTransfer: values[15] || false,
+    cardTransactionType: values[16] || null,
+    invoiceId: values[17] || null,
   };
 
   return createResponse({ transaction });
@@ -485,26 +503,34 @@ function createTransaction(data) {
     null, // cardId
     null, // currentInstallment
     null, // totalInstallments
+    false, // isTransfer
+    data.cardTransactionType || null, // debit or credit
+    data.invoiceId || null, // invoiceId
   ];
 
   sheet.appendRow(row);
 
   // Check if category is a user name (transfer between users)
   const categoryLower = (data.category || "").toLowerCase();
-  const userNames = Object.keys(CONFIG.USERS).map(u => u.toLowerCase());
-  
+  const userNames = Object.keys(CONFIG.USERS).map((u) => u.toLowerCase());
+
   if (data.type === "expense" && userNames.includes(categoryLower)) {
-    // This is a transfer! Create reciprocal income transaction for the receiver
-    const receiverName = categoryLower.charAt(0).toUpperCase() + categoryLower.slice(1);
-    const reciprocalId = generateId();
+    // This is a transfer! Mark original as transfer and change type
+    sheet.getRange(sheet.getLastRow(), 4).setValue("transfer"); // Change type to transfer
+    sheet.getRange(sheet.getLastRow(), 16).setValue(true); // Mark as transfer
     
+    // Create reciprocal transfer transaction for the receiver
+    const receiverName =
+      categoryLower.charAt(0).toUpperCase() + categoryLower.slice(1);
+    const reciprocalId = generateId();
+
     const reciprocalRow = [
       reciprocalId,
       `Transferência de ${data.person}`, // Description shows who sent it
       data.amount,
-      "income", // Income for receiver
+      "transfer", // Type is transfer, not income
       receiverName.toLowerCase(), // Person is the receiver
-      "particular", // Category for income
+      "particular", // Category
       new Date(data.dueDate),
       data.status || "pending", // Same status as original
       `Origem: ${data.description}`, // Notes reference original transaction
@@ -514,8 +540,11 @@ function createTransaction(data) {
       null, // cardId
       null, // currentInstallment
       null, // totalInstallments
+      true, // isTransfer
+      null, // cardTransactionType
+      null, // invoiceId
     ];
-    
+
     sheet.appendRow(reciprocalRow);
   }
 
@@ -559,9 +588,12 @@ function updateTransaction(data) {
     sheet.getRange(row, 13).getValue() || null, // Keep cardId
     sheet.getRange(row, 14).getValue() || null, // Keep currentInstallment
     sheet.getRange(row, 15).getValue() || null, // Keep totalInstallments
+    sheet.getRange(row, 16).getValue() || false, // Keep isTransfer
+    data.cardTransactionType || sheet.getRange(row, 17).getValue() || null, // Update or keep cardTransactionType
+    data.invoiceId || sheet.getRange(row, 18).getValue() || null, // Update or keep invoiceId
   ];
 
-  sheet.getRange(row, 1, 1, 15).setValues([updates]);
+  sheet.getRange(row, 1, 1, 18).setValues([updates]);
 
   return createResponse({
     success: true,
@@ -640,7 +672,7 @@ function getSummary(data) {
     });
   }
 
-  const range = sheet.getRange(2, 1, lastRow - 1, 12);
+  const range = sheet.getRange(2, 1, lastRow - 1, 18);
   const values = range.getValues();
 
   // Apply month/year filter (default to current month/year)
@@ -654,6 +686,8 @@ function getSummary(data) {
       person: row[4],
       dueDate: row[6],
       status: row[7],
+      isTransfer: row[15] || false,
+      cardTransactionType: row[16] || null,
     }))
     .filter((t) => {
       if (!t.amount) return false;
@@ -683,17 +717,37 @@ function getSummary(data) {
     totalExpense: 0,
     totalPending: 0,
     totalCard: 0,
-    totalCardPending: 0,
     totalSavings: 0,
   };
 
   transactions.forEach((t) => {
-    // Cartão: separado, não entra nos totais principais
-    if (t.type === "cartao") {
-      summary.totalCard += t.amount;
+    // Transferências: não contam como receita/despesa, apenas ajustam saldo
+    if (t.isTransfer || t.type === "transfer") {
+      // Transfers affect balance but don't count as income/expense
+      return;
+    }
+
+    // Cartão débito: remove do saldo como despesa normal
+    if (t.type === "cartao" && t.cardTransactionType === "debit") {
+      summary.totalExpense += t.amount;
       if (t.status === "pending") {
-        summary.totalCardPending += t.amount;
+        summary.totalPending += t.amount;
       }
+      return;
+    }
+
+    // Cartão crédito: NUNCA entra em despesas ou pendentes gerais
+    // Apenas soma no totalCard (separado)
+    if (t.type === "cartao" && t.cardTransactionType === "credit") {
+      summary.totalCard += t.amount;
+      // NÃO adiciona em totalPending - cartão tem seu próprio contador
+      return;
+    }
+
+    // Cartão sem tipo especificado (retrocompatibilidade) - trata como crédito
+    if (t.type === "cartao" && !t.cardTransactionType) {
+      summary.totalCard += t.amount;
+      // NÃO adiciona em totalPending - cartão tem seu próprio contador
       return;
     }
 
@@ -962,6 +1016,241 @@ function deleteCard(data) {
 }
 
 // ==========================================
+// Invoice Management
+// ==========================================
+
+function getInvoicesSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(CONFIG.INVOICES_SHEET);
+
+  if (!sheet) {
+    sheet = ss.insertSheet(CONFIG.INVOICES_SHEET);
+    sheet
+      .getRange(1, 1, 1, 9)
+      .setValues([
+        [
+          "ID",
+          "ID Cartão",
+          "Mês Referência",
+          "Ano Referência",
+          "Data Fechamento",
+          "Data Vencimento",
+          "Valor Total",
+          "Status",
+          "Data Criação",
+        ],
+      ]);
+    sheet.getRange(1, 1, 1, 9).setFontWeight("bold");
+  }
+
+  return sheet;
+}
+
+function getInvoices(data) {
+  const sheet = getInvoicesSheet();
+  const lastRow = sheet.getLastRow();
+
+  if (lastRow < 2) {
+    return createResponse({ invoices: [] });
+  }
+
+  const range = sheet.getRange(2, 1, lastRow - 1, 9);
+  const values = range.getValues();
+
+  let invoices = values
+    .map((row) => ({
+      id: row[0],
+      cardId: row[1],
+      month: row[2],
+      year: row[3],
+      closingDate: formatDate(row[4]),
+      dueDate: formatDate(row[5]),
+      totalAmount: row[6],
+      status: row[7],
+      createdAt: row[8],
+    }))
+    .filter((i) => i.id);
+
+  // Filter by card if specified
+  if (data.cardId) {
+    invoices = invoices.filter((i) => i.cardId === data.cardId);
+  }
+
+  // Filter by month/year if specified
+  if (data.month && data.year) {
+    invoices = invoices.filter(
+      (i) => i.month === data.month && i.year === data.year
+    );
+  }
+
+  return createResponse({ invoices });
+}
+
+function createInvoice(data) {
+  const sheet = getInvoicesSheet();
+  const id = Utilities.getUuid();
+  const now = new Date().toISOString();
+
+  // Get card info to validate
+  const cardsSheet = getCardsSheet();
+  const cardRow = findRowById(cardsSheet, data.cardId);
+
+  if (cardRow === -1) {
+    return createResponse({ error: "Card not found" }, 404);
+  }
+
+  const cardValues = cardsSheet.getRange(cardRow, 1, 1, 6).getValues()[0];
+  const card = {
+    dueDay: cardValues[2],
+    closingDay: cardValues[3],
+  };
+
+  // Calculate closing and due dates based on card settings
+  const closingDate = new Date(data.year, data.month - 1, card.closingDay);
+  const dueDate = new Date(data.year, data.month - 1, card.dueDay);
+
+  sheet.appendRow([
+    id,
+    data.cardId,
+    data.month,
+    data.year,
+    closingDate,
+    dueDate,
+    0, // Initial total amount
+    "open", // Status: open, closed, paid
+    now,
+  ]);
+
+  return createResponse({
+    success: true,
+    invoice: {
+      id,
+      cardId: data.cardId,
+      month: data.month,
+      year: data.year,
+      closingDate: formatDate(closingDate),
+      dueDate: formatDate(dueDate),
+      totalAmount: 0,
+      status: "open",
+      createdAt: now,
+    },
+  });
+}
+
+function updateInvoice(data) {
+  const sheet = getInvoicesSheet();
+  const row = findRowById(sheet, data.id);
+
+  if (row === -1) {
+    return createResponse({ error: "Invoice not found" }, 404);
+  }
+
+  // Recalculate total from transactions
+  const total = calculateInvoiceTotal(data.id);
+
+  sheet.getRange(row, 7).setValue(total); // Update total amount
+  if (data.status) {
+    sheet.getRange(row, 8).setValue(data.status); // Update status if provided
+  }
+
+  return createResponse({
+    success: true,
+    message: "Invoice updated successfully",
+  });
+}
+
+function deleteInvoice(data) {
+  const sheet = getInvoicesSheet();
+  const row = findRowById(sheet, data.id);
+
+  if (row === -1) {
+    return createResponse({ error: "Invoice not found" }, 404);
+  }
+
+  // Remove invoice reference from all transactions
+  const transactionsSheet = getSheet();
+  const lastRow = transactionsSheet.getLastRow();
+
+  if (lastRow >= 2) {
+    const invoiceIds = transactionsSheet
+      .getRange(2, 18, lastRow - 1, 1)
+      .getValues();
+
+    for (let i = 0; i < invoiceIds.length; i++) {
+      if (invoiceIds[i][0] === data.id) {
+        transactionsSheet.getRange(i + 2, 18).setValue(null);
+      }
+    }
+  }
+
+  sheet.deleteRow(row);
+
+  return createResponse({
+    success: true,
+    message: "Invoice deleted successfully",
+  });
+}
+
+function closeInvoice(data) {
+  const sheet = getInvoicesSheet();
+  const row = findRowById(sheet, data.id);
+
+  if (row === -1) {
+    return createResponse({ error: "Invoice not found" }, 404);
+  }
+
+  // Recalculate total
+  const total = calculateInvoiceTotal(data.id);
+
+  // Update invoice status
+  sheet.getRange(row, 7).setValue(total);
+  sheet.getRange(row, 8).setValue("closed");
+
+  // Mark all transactions associated with this invoice as PAID
+  const transactionsSheet = getSheet();
+  const lastRow = transactionsSheet.getLastRow();
+
+  if (lastRow >= 2) {
+    const transactionsData = transactionsSheet.getRange(2, 1, lastRow - 1, 18).getValues();
+    
+    for (let i = 0; i < transactionsData.length; i++) {
+      // Check if transaction belongs to this invoice (column 18 = invoiceId)
+      if (transactionsData[i][17] === data.id) {
+        // Update status to paid (column 8)
+        transactionsSheet.getRange(i + 2, 8).setValue("paid");
+      }
+    }
+  }
+
+  return createResponse({
+    success: true,
+    totalAmount: total,
+    message: "Invoice closed successfully",
+  });
+}
+
+function calculateInvoiceTotal(invoiceId) {
+  const sheet = getSheet();
+  const lastRow = sheet.getLastRow();
+
+  if (lastRow < 2) {
+    return 0;
+  }
+
+  const data = sheet.getRange(2, 1, lastRow - 1, 18).getValues();
+  let total = 0;
+
+  data.forEach((row) => {
+    // Check if transaction belongs to this invoice (column 18 = invoiceId)
+    if (row[17] === invoiceId) {
+      total += row[2]; // Add amount (column 3)
+    }
+  });
+
+  return total;
+}
+
+// ==========================================
 // Installment Calculation
 // ==========================================
 
@@ -1017,6 +1306,12 @@ function createInstallmentTransactions(data, card) {
       description = `${data.description} (${i + 1}/${installments})`;
     }
 
+    // Determine invoice if credit card and invoiceId provided
+    let invoiceId = null;
+    if (data.cardTransactionType === "credit" && data.invoiceId) {
+      invoiceId = data.invoiceId;
+    }
+
     sheet.appendRow([
       id,
       description,
@@ -1033,9 +1328,17 @@ function createInstallmentTransactions(data, card) {
       card.id, // cardId
       i + 1, // currentInstallment
       installments, // totalInstallments
+      false, // isTransfer
+      data.cardTransactionType || "credit", // Default to credit for installments
+      invoiceId, // invoiceId
     ]);
 
     createdIds.push(id);
+  }
+
+  // Update invoice total if invoiceId specified
+  if (data.invoiceId) {
+    updateInvoice({ id: data.invoiceId });
   }
 
   return createdIds;

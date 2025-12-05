@@ -145,6 +145,48 @@ const API = {
   async deleteCard(id) {
     return await this.request("deleteCard", { id });
   },
+
+  // ==========================================
+  // Invoice Operations
+  // ==========================================
+
+  /**
+   * Get all invoices or filter by card/month/year
+   */
+  async getInvoices(filters = {}) {
+    return await this.request("getInvoices", filters);
+  },
+
+  /**
+   * Create new invoice
+   */
+  async createInvoice(invoiceData) {
+    return await this.request("createInvoice", invoiceData);
+  },
+
+  /**
+   * Update invoice (recalculates total)
+   */
+  async updateInvoice(id, status = null) {
+    return await this.request("updateInvoice", {
+      id,
+      ...(status && { status }),
+    });
+  },
+
+  /**
+   * Delete invoice
+   */
+  async deleteInvoice(id) {
+    return await this.request("deleteInvoice", { id });
+  },
+
+  /**
+   * Close invoice (calculates total and sets status to closed)
+   */
+  async closeInvoice(id) {
+    return await this.request("closeInvoice", { id });
+  },
 };
 
 // Make API available globally

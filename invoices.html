@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Faturas - FinnanceFlow</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>📄</text></svg>"
+    />
+    <link rel="stylesheet" href="css/styles.css" />
+    <link rel="stylesheet" href="css/dashboard.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header class="header">
+        <h1>📄 Faturas de Cartão</h1>
+        <button id="logoutBtn" class="btn btn-secondary">Sair</button>
+      </header>
+
+      <nav class="nav-menu">
+        <a href="dashboard.html" class="nav-link">📊 Dashboard</a>
+        <a href="cards.html" class="nav-link">💳 Cartões</a>
+        <a href="invoices.html" class="nav-link active">📄 Faturas</a>
+      </nav>
+
+      <div class="actions">
+        <button id="addInvoiceBtn" class="btn btn-primary">
+          + Nova Fatura
+        </button>
+      </div>
+
+      <div id="invoicesList" class="invoices-grid"></div>
+    </div>
+
+    <!-- Invoice Modal -->
+    <div id="invoiceModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 id="modalTitle">Nova Fatura</h2>
+          <button class="modal-close">&times;</button>
+        </div>
+        <form id="invoiceForm">
+          <input type="hidden" id="invoiceId" name="id" />
+
+          <div class="form-group">
+            <label for="invoiceCard">Cartão *</label>
+            <select id="invoiceCard" name="cardId" required>
+              <option value="">Selecione um cartão</option>
+            </select>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="invoiceMonth">Mês *</label>
+              <select id="invoiceMonth" name="month" required>
+                <option value="">Selecione</option>
+                <option value="1">Janeiro</option>
+                <option value="2">Fevereiro</option>
+                <option value="3">Março</option>
+                <option value="4">Abril</option>
+                <option value="5">Maio</option>
+                <option value="6">Junho</option>
+                <option value="7">Julho</option>
+                <option value="8">Agosto</option>
+                <option value="9">Setembro</option>
+                <option value="10">Outubro</option>
+                <option value="11">Novembro</option>
+                <option value="12">Dezembro</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="invoiceYear">Ano *</label>
+              <input
+                type="number"
+                id="invoiceYear"
+                name="year"
+                min="2020"
+                max="2099"
+                required
+              />
+            </div>
+          </div>
+
+          <div class="invoice-details" id="invoiceInfo" style="display: none">
+            <div class="detail-row">
+              <span class="detail-label">Data Fechamento</span>
+              <span class="detail-value" id="infoClosingDate">-</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Data Vencimento</span>
+              <span class="detail-value" id="infoDueDate">-</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Valor Total</span>
+              <span class="detail-value detail-amount" id="infoTotalAmount"
+                >R$ 0,00</span
+              >
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">Status</span>
+              <span id="infoStatus" class="status-badge">-</span>
+            </div>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary modal-close">
+              Cancelar
+            </button>
+            <button type="submit" class="btn btn-primary" id="saveInvoiceBtn">
+              Salvar
+            </button>
+            <button
+              type="button"
+              id="closeInvoiceBtn"
+              class="btn btn-warning"
+              style="display: none"
+            >
+              Fechar Fatura
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/invoices.js"></script>
+  </body>
+</html>

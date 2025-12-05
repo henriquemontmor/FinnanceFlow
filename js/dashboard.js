@@ -165,6 +165,65 @@ async function initializeCardSelect() {
   }
 }
 
+async function initializeInvoiceSelect() {
+  const invoiceSelect = document.getElementById("invoiceId");
+  const cardSelect = document.getElementById("cardId");
+  if (!invoiceSelect || !cardSelect) return;
+
+  const cardId = cardSelect.value;
+  if (!cardId) {
+    invoiceSelect.innerHTML = '<option value="">Sem fatura associada</option>';
+    return;
+  }
+
+  try {
+    const response = await API.getInvoices({ cardId, status: "open" });
+    const invoices = response.invoices || [];
+
+    // Clear existing options
+    invoiceSelect.innerHTML = '<option value="">Sem fatura associada</option>';
+
+    // Add invoice options (only open ones)
+    invoices
+      .filter((inv) => inv.status === "open")
+      .forEach((invoice) => {
+        const option = document.createElement("option");
+        option.value = invoice.id;
+        const monthName = getMonthName(invoice.month);
+        option.textContent = `${monthName}/${
+          invoice.year
+        } - Vence ${formatDateShort(invoice.dueDate)}`;
+        invoiceSelect.appendChild(option);
+      });
+  } catch (error) {
+    console.error("Error loading invoices:", error);
+  }
+}
+
+function getMonthName(month) {
+  const months = [
+    "Jan",
+    "Fev",
+    "Mar",
+    "Abr",
+    "Mai",
+    "Jun",
+    "Jul",
+    "Ago",
+    "Set",
+    "Out",
+    "Nov",
+    "Dez",
+  ];
+  return months[month - 1] || "";
+}
+
+function formatDateShort(dateStr) {
+  if (!dateStr) return "";
+  const date = new Date(dateStr + "T00:00:00");
+  return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+}
+
 function initializeEventListeners() {
   // Logout
   if (logoutBtn) {
@@ -235,6 +294,30 @@ function initializeEventListeners() {
         if (isRecurringCheckbox) {
           isRecurringCheckbox.disabled = false;
         }
+      }
+    });
+  }
+
+  // Card transaction type change - show/hide invoice select
+  const cardTransactionType = document.getElementById("cardTransactionType");
+  const invoiceSelectGroup = document.getElementById("invoiceSelectGroup");
+  if (cardTransactionType && invoiceSelectGroup) {
+    cardTransactionType.addEventListener("change", (e) => {
+      if (e.target.value === "credit") {
+        invoiceSelectGroup.style.display = "block";
+        initializeInvoiceSelect();
+      } else {
+        invoiceSelectGroup.style.display = "none";
+      }
+    });
+  }
+
+  // Card selection change - reload invoices
+  const cardSelect = document.getElementById("cardId");
+  if (cardSelect && invoiceSelectGroup) {
+    cardSelect.addEventListener("change", () => {
+      if (cardTransactionType && cardTransactionType.value === "credit") {
+        initializeInvoiceSelect();
       }
     });
   }
@@ -747,14 +830,23 @@ async function handleFormSubmit(e) {
   if (isInstallment && !id && isExpense) {
     transactionData.installments = parseInt(formData.get("installments"));
     transactionData.cardId = formData.get("cardId");
+    transactionData.cardTransactionType = formData.get("cardTransactionType");
+    transactionData.invoiceId = formData.get("invoiceId") || null;
 
     if (!transactionData.cardId) {
-      showError("Por favor, selecione um cartão de crédito.");
+      showError("Por favor, selecione um cartão.");
       return;
     }
 
-    if (!transactionData.installments || transactionData.installments < 2) {
-      showError("Número de parcelas deve ser maior que 1.");
+    if (!transactionData.cardTransactionType) {
+      showError(
+        "Por favor, selecione o tipo de transação (débito ou crédito)."
+      );
+      return;
+    }
+
+    if (!transactionData.installments || transactionData.installments < 1) {
+      showError("Número de parcelas deve ser maior ou igual a 1.");
       return;
     }
   }

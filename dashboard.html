@@ -17,6 +17,9 @@
         <h1 class="nav-logo">💰 FinnanceFlow</h1>
         <div style="display: flex; gap: 1rem; align-items: center">
           <a href="cards.html" class="btn btn-secondary btn-sm">💳 Cartões</a>
+          <a href="invoices.html" class="btn btn-secondary btn-sm"
+            >📄 Faturas</a
+          >
           <button id="logoutBtn" class="btn btn-secondary btn-sm">Sair</button>
         </div>
       </div>
@@ -195,10 +198,32 @@
           <!-- Installment Fields -->
           <div id="installmentFields" style="display: none">
             <div class="form-group">
-              <label for="cardId">Cartão de Crédito *</label>
+              <label for="cardTransactionType">Tipo de Transação *</label>
+              <select id="cardTransactionType" name="cardTransactionType">
+                <option value="debit">Débito (sai do saldo)</option>
+                <option value="credit">Crédito (vai para fatura)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="cardId">Cartão *</label>
               <select id="cardId" name="cardId">
                 <option value="">Selecione um cartão</option>
               </select>
+            </div>
+
+            <div
+              class="form-group"
+              id="invoiceSelectGroup"
+              style="display: none"
+            >
+              <label for="invoiceId">Fatura (opcional)</label>
+              <select id="invoiceId" name="invoiceId">
+                <option value="">Sem fatura associada</option>
+              </select>
+              <small class="form-help">
+                Vincule a compra a uma fatura existente (apenas para crédito)
+              </small>
             </div>
 
             <div class="form-group">
@@ -207,12 +232,14 @@
                 type="number"
                 id="installments"
                 name="installments"
-                min="2"
+                min="1"
                 max="48"
+                value="1"
                 placeholder="Ex: 12"
               />
               <small class="form-help">
-                O valor será dividido igualmente entre as parcelas
+                Use 1 para compra à vista. O valor será dividido entre as
+                parcelas.
               </small>
             </div>
           </div>
