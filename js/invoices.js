@@ -202,15 +202,15 @@
       document.getElementById("infoStatus").className =
         "status-badge " + getStatusClass(invoice.status);
 
-      // Show close button if status is open
+      // Show close button if status is open, hide save button
+      const saveBtn = document.getElementById("saveInvoiceBtn");
       if (invoice.status === "open") {
         closeInvoiceBtn.style.display = "inline-block";
+        saveBtn.style.display = "none";
       } else {
         closeInvoiceBtn.style.display = "none";
+        saveBtn.style.display = "none";
       }
-
-      // Hide save button in view mode
-      invoiceForm.querySelector('button[type="submit"]').style.display = "none";
     } else {
       // Create mode
       invoiceForm.reset();
@@ -219,8 +219,7 @@
       document.getElementById("invoiceYear").disabled = false;
       document.getElementById("invoiceInfo").style.display = "none";
       closeInvoiceBtn.style.display = "none";
-      invoiceForm.querySelector('button[type="submit"]').style.display =
-        "inline-block";
+      document.getElementById("saveInvoiceBtn").style.display = "inline-block";
 
       // Set default year to current
       const currentYear = new Date().getFullYear();
