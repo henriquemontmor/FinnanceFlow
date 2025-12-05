@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cartões - FinnanceFlow</title>
+    <link rel="stylesheet" href="css/styles.css" />
+    <link rel="stylesheet" href="css/dashboard.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header class="header">
+        <h1>💳 Meus Cartões</h1>
+        <button id="logoutBtn" class="btn btn-secondary">Sair</button>
+      </header>
+
+      <nav class="nav-menu">
+        <a href="dashboard.html" class="nav-link">Dashboard</a>
+        <a href="cards.html" class="nav-link active">Cartões</a>
+      </nav>
+
+      <div class="actions">
+        <button id="addCardBtn" class="btn btn-primary">+ Novo Cartão</button>
+      </div>
+
+      <div id="cardsList" class="cards-grid"></div>
+    </div>
+
+    <!-- Card Modal -->
+    <div id="cardModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 id="modalTitle">Novo Cartão</h2>
+          <button class="modal-close">&times;</button>
+        </div>
+        <form id="cardForm">
+          <input type="hidden" id="cardId" name="id" />
+
+          <div class="form-group">
+            <label for="cardName">Nome do Cartão *</label>
+            <input
+              type="text"
+              id="cardName"
+              name="name"
+              placeholder="Ex: Nubank, Itaú, etc"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="closingDay">Dia do Fechamento *</label>
+            <input
+              type="number"
+              id="closingDay"
+              name="closingDay"
+              min="1"
+              max="31"
+              placeholder="Ex: 10"
+              required
+            />
+            <small>Dia do mês em que a fatura fecha</small>
+          </div>
+
+          <div class="form-group">
+            <label for="dueDay">Dia do Vencimento *</label>
+            <input
+              type="number"
+              id="dueDay"
+              name="dueDay"
+              min="1"
+              max="31"
+              placeholder="Ex: 20"
+              required
+            />
+            <small>Dia do mês para pagamento da fatura</small>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary modal-cancel">
+              Cancelar
+            </button>
+            <button type="submit" class="btn btn-primary">Salvar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/cards.js"></script>
+  </body>
+</html>

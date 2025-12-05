@@ -11,7 +11,10 @@
     <nav class="navbar">
       <div class="nav-container">
         <h1 class="nav-logo">💰 FinnanceFlow</h1>
-        <button id="logoutBtn" class="btn btn-secondary btn-sm">Sair</button>
+        <div style="display: flex; gap: 1rem; align-items: center">
+          <a href="cards.html" class="btn btn-secondary btn-sm">💳 Cartões</a>
+          <button id="logoutBtn" class="btn btn-secondary btn-sm">Sair</button>
+        </div>
       </div>
     </nav>
 
@@ -118,7 +121,7 @@
 
           <input type="hidden" id="type" name="type" value="expense" />
 
-          <div class="form-group">
+          <div class="form-group" id="personGroup">
             <label for="person">Responsável *</label>
             <select id="person" name="person" required>
               <option value="pessoa1">Pessoa 1</option>
@@ -130,13 +133,7 @@
           <div class="form-group">
             <label for="category">Categoria</label>
             <select id="category" name="category">
-              <option value="alimentacao">Alimentação</option>
-              <option value="moradia">Moradia</option>
-              <option value="transporte">Transporte</option>
-              <option value="saude">Saúde</option>
-              <option value="lazer">Lazer</option>
-              <option value="educacao">Educação</option>
-              <option value="outros">Outros</option>
+              <!-- Options will be populated dynamically based on type -->
             </select>
           </div>
 
@@ -145,7 +142,7 @@
             <input type="date" id="dueDate" name="dueDate" required />
           </div>
 
-          <div class="form-group">
+          <div class="form-group" id="statusGroup">
             <label for="status">Status *</label>
             <select id="status" name="status" required>
               <option value="pending">Pendente</option>
@@ -158,7 +155,39 @@
             <textarea id="notes" name="notes" rows="3"></textarea>
           </div>
 
-          <div class="form-group">
+          <!-- Installment Fields -->
+          <div id="installmentFields" style="display: none">
+            <div class="form-group">
+              <label for="cardId">Cartão de Crédito *</label>
+              <select id="cardId" name="cardId">
+                <option value="">Selecione um cartão</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="installments">Número de Parcelas *</label>
+              <input
+                type="number"
+                id="installments"
+                name="installments"
+                min="2"
+                max="48"
+                placeholder="Ex: 12"
+              />
+              <small class="form-help">
+                O valor será dividido igualmente entre as parcelas
+              </small>
+            </div>
+          </div>
+
+          <div class="form-group" id="installmentCheckboxGroup">
+            <label class="checkbox-label">
+              <input type="checkbox" id="isInstallment" name="isInstallment" />
+              <span>💳 Compra parcelada no cartão</span>
+            </label>
+          </div>
+
+          <div class="form-group" id="recurringGroup">
             <label class="checkbox-label">
               <input type="checkbox" id="isRecurring" name="isRecurring" />
               <span>Despesa recorrente (se repete todo mês)</span>

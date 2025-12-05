@@ -49,6 +49,7 @@ document.addEventListener("DOMContentLoaded", () => {
     initMonthYearFilter(); // Initialize month/year filter
     initializeViewButtons(); // Initialize view buttons with user names
     initializePersonSelect(); // Initialize person select in modal
+    initializeCardSelect(); // Initialize card select for installments
     initializeEventListeners();
     loadDashboardData();
     setActiveView(currentView);
@@ -69,14 +70,14 @@ function initializeViewButtons() {
   // Clear existing buttons
   viewSelector.innerHTML = "";
 
-  // Add "My View" button (user's own transactions + shared)
+  // Add "My View" button (user's own transactions only, not shared)
   const myViewBtn = document.createElement("button");
   myViewBtn.className = "view-btn active";
   myViewBtn.dataset.view = currentUsername;
   myViewBtn.textContent = `Minhas Contas`;
   viewSelector.appendChild(myViewBtn);
 
-  // Add "Shared" button
+  // Add "Shared" button (shared expenses only)
   const sharedBtn = document.createElement("button");
   sharedBtn.className = "view-btn";
   sharedBtn.dataset.view = "geral";
@@ -114,6 +115,38 @@ function initializePersonSelect() {
   personSelect.appendChild(sharedOption);
 }
 
+async function initializeCardSelect() {
+  const cardSelect = document.getElementById("cardId");
+  if (!cardSelect) return;
+
+  try {
+    const response = await API.getCards();
+    const cards = response.cards || [];
+
+    // Clear existing options except first
+    cardSelect.innerHTML = '<option value="">Selecione um cartão</option>';
+
+    // Add card options
+    cards.forEach((card) => {
+      const option = document.createElement("option");
+      option.value = card.id;
+      option.textContent = `${card.name} (Fecha dia ${card.closingDay})`;
+      cardSelect.appendChild(option);
+    });
+
+    // Add option to create new card if none exist
+    if (cards.length === 0) {
+      const noCardOption = document.createElement("option");
+      noCardOption.value = "";
+      noCardOption.textContent = "Nenhum cartão cadastrado";
+      noCardOption.disabled = true;
+      cardSelect.appendChild(noCardOption);
+    }
+  } catch (error) {
+    console.error("Error loading cards:", error);
+  }
+}
+
 function initializeEventListeners() {
   // Logout
   if (logoutBtn) {
@@ -136,6 +169,49 @@ function initializeEventListeners() {
   if (addIncomeBtn) {
     addIncomeBtn.addEventListener("click", () => {
       openModal("income");
+    });
+  }
+
+  // Installment checkbox toggle
+  const isInstallmentCheckbox = document.getElementById("isInstallment");
+  const installmentFields = document.getElementById("installmentFields");
+  const isRecurringCheckbox = document.getElementById("isRecurring");
+
+  if (isInstallmentCheckbox && installmentFields) {
+    isInstallmentCheckbox.addEventListener("change", (e) => {
+      if (e.target.checked) {
+        installmentFields.style.display = "block";
+        document.getElementById("cardId").required = true;
+        document.getElementById("installments").required = true;
+        // Disable recurring when installment is checked
+        if (isRecurringCheckbox) {
+          isRecurringCheckbox.checked = false;
+          isRecurringCheckbox.disabled = true;
+        }
+      } else {
+        installmentFields.style.display = "none";
+        document.getElementById("cardId").required = false;
+        document.getElementById("installments").required = false;
+        // Re-enable recurring
+        if (isRecurringCheckbox) {
+          isRecurringCheckbox.disabled = false;
+        }
+      }
+    });
+  }
+
+  // Recurring checkbox - disable installment when checked
+  if (isRecurringCheckbox && isInstallmentCheckbox) {
+    isRecurringCheckbox.addEventListener("change", (e) => {
+      if (e.target.checked) {
+        isInstallmentCheckbox.checked = false;
+        isInstallmentCheckbox.disabled = true;
+        if (installmentFields) {
+          installmentFields.style.display = "none";
+        }
+      } else {
+        isInstallmentCheckbox.disabled = false;
+      }
     });
   }
 
@@ -298,6 +374,12 @@ function createTransactionElement(transaction) {
     ? `<span class="recurring-badge">🔄 Recorrente</span>`
     : "";
 
+  // Show installment info if applicable
+  const installmentBadge =
+    transaction.currentInstallment && transaction.totalInstallments
+      ? `<span class="recurring-badge">${transaction.currentInstallment}/${transaction.totalInstallments}</span>`
+      : "";
+
   return `
         <div class="transaction-item" data-id="${transaction.id}">
             <div class="transaction-icon ${typeClass}">
@@ -307,6 +389,7 @@ function createTransactionElement(transaction) {
                 <div class="transaction-title">
                     ${transaction.description}
                     ${recurringBadge}
+                    ${installmentBadge}
                 </div>
                 <div class="transaction-meta">
                     <span>${formatDate(transaction.dueDate)}</span>
@@ -437,9 +520,85 @@ function openModal(type = "expense") {
   document.getElementById("dueDate").value = today;
 
   modalTitle.textContent = type === "expense" ? "Nova Despesa" : "Nova Receita";
-  modal.classList.add("active");
 
+  // Show/hide fields based on type
+  const isExpense = type === "expense";
+
+  // Person field - only for expenses
+  const personGroup = document.getElementById("personGroup");
+  if (personGroup) {
+    personGroup.style.display = isExpense ? "block" : "none";
+    document.getElementById("person").required = isExpense;
+  }
+
+  // Status field - only for expenses (income is always "paid")
+  const statusGroup = document.getElementById("statusGroup");
+  if (statusGroup) {
+    statusGroup.style.display = isExpense ? "block" : "none";
+    document.getElementById("status").required = isExpense;
+  }
+
+  // Installment checkbox - only for expenses
+  const installmentCheckboxGroup = document.getElementById(
+    "installmentCheckboxGroup"
+  );
+  if (installmentCheckboxGroup) {
+    installmentCheckboxGroup.style.display = isExpense ? "block" : "none";
+  }
+
+  // Recurring checkbox - only for expenses
+  const recurringGroup = document.getElementById("recurringGroup");
+  if (recurringGroup) {
+    recurringGroup.style.display = isExpense ? "block" : "none";
+  }
+
+  // Reset checkboxes
+  document.getElementById("isInstallment").checked = false;
+  document.getElementById("isRecurring").checked = false;
+  document.getElementById("installmentFields").style.display = "none";
+
+  // Populate categories based on type
+  populateCategories(type);
+
+  modal.classList.add("active");
   document.getElementById("description").focus();
+}
+
+function populateCategories(type) {
+  const categorySelect = document.getElementById("category");
+
+  const expenseCategories = [
+    { value: "alimentacao", label: "Alimentação" },
+    { value: "lanche", label: "Lanche" },
+    { value: "salgadinho", label: "Salgadinho" },
+    { value: "moradia", label: "Moradia" },
+    { value: "transporte", label: "Transporte" },
+    { value: "saude", label: "Saúde" },
+    { value: "lazer", label: "Lazer" },
+    { value: "educacao", label: "Educação" },
+    { value: "parcela", label: "Parcela" },
+    { value: "henrique", label: "Henrique" },
+    { value: "juliana", label: "Juliana" },
+    { value: "outros", label: "Outros" },
+  ];
+
+  const incomeCategories = [
+    { value: "salario", label: "Salário" },
+    { value: "particular", label: "Particular" },
+    { value: "salgado", label: "Salgado" },
+    { value: "freelancer", label: "Freelancer" },
+    { value: "outros", label: "Outros" },
+  ];
+
+  const categories = type === "expense" ? expenseCategories : incomeCategories;
+
+  categorySelect.innerHTML = "";
+  categories.forEach((cat) => {
+    const option = document.createElement("option");
+    option.value = cat.value;
+    option.textContent = cat.label;
+    categorySelect.appendChild(option);
+  });
 }
 
 function closeModal() {
@@ -452,33 +611,58 @@ async function handleFormSubmit(e) {
 
   const formData = new FormData(transactionForm);
   const id = formData.get("id");
+  const transactionType = formData.get("type");
+  const isExpense = transactionType === "expense";
+  const isInstallment = document.getElementById("isInstallment").checked;
 
   const transactionData = {
     description: formData.get("description"),
     amount: parseFloat(formData.get("amount")),
-    type: formData.get("type"),
-    person: formData.get("person"),
+    type: transactionType,
+    // For income: always current user and paid
+    // For expense: use form values
+    person: isExpense ? formData.get("person") : currentUsername,
     category: formData.get("category"),
     dueDate: formData.get("dueDate"),
-    status: formData.get("status"),
+    status: isExpense ? formData.get("status") : "paid",
     notes: formData.get("notes"),
-    isRecurring: document.getElementById("isRecurring").checked,
+    isRecurring: isExpense
+      ? document.getElementById("isRecurring").checked
+      : false,
   };
 
+  // Add installment data if checked
+  if (isInstallment && !id && isExpense) {
+    transactionData.installments = parseInt(formData.get("installments"));
+    transactionData.cardId = formData.get("cardId");
+
+    if (!transactionData.cardId) {
+      showError("Por favor, selecione um cartão de crédito.");
+      return;
+    }
+
+    if (!transactionData.installments || transactionData.installments < 2) {
+      showError("Número de parcelas deve ser maior que 1.");
+      return;
+    }
+  }
+
   try {
+    // Close modal immediately to prevent double submission
+    closeModal();
+
     if (id) {
       transactionData.id = id;
       await API.updateTransaction(id, transactionData);
-      showSuccess("Transação atualizada com sucesso!");
+      showSuccess("Transação atualizada!");
     } else {
       await API.createTransaction(transactionData);
-      const message = transactionData.isRecurring
-        ? "Transação recorrente criada! 🔄"
-        : "Transação criada com sucesso!";
-      showSuccess(message);
+      // Show brief success message only for installments
+      if (isInstallment && isExpense) {
+        showSuccess(`${transactionData.installments} parcelas criadas! 💳`);
+      }
     }
 
-    closeModal();
     await loadDashboardData();
   } catch (error) {
     console.error("Error saving transaction:", error);

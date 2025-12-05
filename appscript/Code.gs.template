@@ -15,6 +15,7 @@
 const CONFIG = {
   SHEET_NAME: "Transacoes",
   TOKEN_SHEET: "Tokens",
+  CARDS_SHEET: "Cartoes",
   
   // ==========================================
   // 🔐 CONFIGURE SEUS USUÁRIOS AQUI
@@ -69,12 +70,12 @@ function doGet(e) {
 
 // Handle CORS preflight requests (OPTIONS method)
 function doOptions(e) {
-  return ContentService.createTextOutput('')
+  return ContentService.createTextOutput("")
     .setMimeType(ContentService.MimeType.TEXT)
-    .setHeader('Access-Control-Allow-Origin', '*')
-    .setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-    .setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-    .setHeader('Access-Control-Max-Age', '86400');
+    .setHeader("Access-Control-Allow-Origin", "*")
+    .setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+    .setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization")
+    .setHeader("Access-Control-Max-Age", "86400");
 }
 
 function doPost(e) {
@@ -106,6 +107,10 @@ function doPost(e) {
       case "deleteTransaction":
       case "markAsPaid":
       case "getSummary":
+      case "getCards":
+      case "createCard":
+      case "updateCard":
+      case "deleteCard":
         // Validate token for protected routes
         const username = validateTokenAndGetUser(data.token);
         if (!username) {
@@ -123,6 +128,10 @@ function doPost(e) {
         if (action === "deleteTransaction") return deleteTransaction(data);
         if (action === "markAsPaid") return markAsPaid(data);
         if (action === "getSummary") return getSummary(data);
+        if (action === "getCards") return getCards(data);
+        if (action === "createCard") return createCard(data);
+        if (action === "updateCard") return updateCard(data);
+        if (action === "deleteCard") return deleteCard(data);
         break;
 
       default:
@@ -310,6 +319,9 @@ function initializeSheet(sheet) {
     "Recorrente",
     "Data Criação",
     "Data Atualização",
+    "ID Cartão",
+    "Parcela Atual",
+    "Total Parcelas",
   ];
 
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
@@ -333,7 +345,7 @@ function getTransactions(data) {
     });
   }
 
-  const range = sheet.getRange(2, 1, lastRow - 1, 12);
+  const range = sheet.getRange(2, 1, lastRow - 1, 15);
   const values = range.getValues();
 
   let transactions = values
@@ -350,6 +362,9 @@ function getTransactions(data) {
       isRecurring: row[9] || false,
       createdAt: row[10],
       updatedAt: row[11],
+      cardId: row[12] || null,
+      currentInstallment: row[13] || null,
+      totalInstallments: row[14] || null,
     }))
     .filter((t) => t.id); // Filter out empty rows
 
@@ -365,14 +380,18 @@ function getTransactions(data) {
     );
   });
 
-  // Apply user access control - only show own transactions and shared
+  // Apply user access control and view filter
   const currentUser = data.currentUser;
-  transactions = transactions.filter(
-    (t) => t.person === currentUser || t.person === "shared"
-  );
 
-  // Apply view filter (only if user is viewing their own or shared)
-  if (data.view && data.view !== "geral" && data.view !== currentUser) {
+  if (data.view === "geral") {
+    // Show only shared transactions
+    transactions = transactions.filter((t) => t.person === "shared");
+  } else if (data.view === currentUser || !data.view) {
+    // Show user's own transactions + shared
+    transactions = transactions.filter(
+      (t) => t.person === currentUser || t.person === "shared"
+    );
+  } else {
     // User trying to view someone else's data - return empty
     transactions = [];
   }
@@ -392,7 +411,7 @@ function getTransaction(data) {
     return createResponse({ error: "Transaction not found" }, 404);
   }
 
-  const values = sheet.getRange(row, 1, 1, 12).getValues()[0];
+  const values = sheet.getRange(row, 1, 1, 15).getValues()[0];
 
   const transaction = {
     id: values[0],
@@ -407,12 +426,44 @@ function getTransaction(data) {
     isRecurring: values[9] || false,
     createdAt: values[10],
     updatedAt: values[11],
+    cardId: values[12] || null,
+    currentInstallment: values[13] || null,
+    totalInstallments: values[14] || null,
   };
 
   return createResponse({ transaction });
 }
 
 function createTransaction(data) {
+  // Check if this is an installment purchase
+  if (data.installments && data.installments > 1 && data.cardId) {
+    // Get card information
+    const cardsSheet = getCardsSheet();
+    const cardRow = findRowById(cardsSheet, data.cardId);
+
+    if (cardRow === -1) {
+      return createResponse({ error: "Card not found" }, 404);
+    }
+
+    const cardValues = cardsSheet.getRange(cardRow, 1, 1, 6).getValues()[0];
+    const card = {
+      id: cardValues[0],
+      name: cardValues[1],
+      dueDay: cardValues[2],
+      closingDay: cardValues[3],
+    };
+
+    // Create installment transactions
+    const createdIds = createInstallmentTransactions(data, card);
+
+    return createResponse({
+      success: true,
+      ids: createdIds,
+      message: `${data.installments} parcelas criadas com sucesso`,
+    });
+  }
+
+  // Regular transaction (not installment)
   const sheet = getSheet();
   const id = generateId();
   const now = new Date();
@@ -431,9 +482,42 @@ function createTransaction(data) {
     isRecurring,
     now,
     now,
+    null, // cardId
+    null, // currentInstallment
+    null, // totalInstallments
   ];
 
   sheet.appendRow(row);
+
+  // Check if category is a user name (transfer between users)
+  const categoryLower = (data.category || "").toLowerCase();
+  const userNames = Object.keys(CONFIG.USERS).map(u => u.toLowerCase());
+  
+  if (data.type === "expense" && userNames.includes(categoryLower)) {
+    // This is a transfer! Create reciprocal income transaction for the receiver
+    const receiverName = categoryLower.charAt(0).toUpperCase() + categoryLower.slice(1);
+    const reciprocalId = generateId();
+    
+    const reciprocalRow = [
+      reciprocalId,
+      `Transferência de ${data.person}`, // Description shows who sent it
+      data.amount,
+      "income", // Income for receiver
+      receiverName.toLowerCase(), // Person is the receiver
+      "particular", // Category for income
+      new Date(data.dueDate),
+      data.status || "pending", // Same status as original
+      `Origem: ${data.description}`, // Notes reference original transaction
+      false, // Not recurring
+      now,
+      now,
+      null, // cardId
+      null, // currentInstallment
+      null, // totalInstallments
+    ];
+    
+    sheet.appendRow(reciprocalRow);
+  }
 
   // If recurring, create next month's transaction automatically
   if (isRecurring) {
@@ -472,9 +556,12 @@ function updateTransaction(data) {
     data.isRecurring || false,
     sheet.getRange(row, 11).getValue(), // Keep original createdAt
     now,
+    sheet.getRange(row, 13).getValue() || null, // Keep cardId
+    sheet.getRange(row, 14).getValue() || null, // Keep currentInstallment
+    sheet.getRange(row, 15).getValue() || null, // Keep totalInstallments
   ];
 
-  sheet.getRange(row, 1, 1, 12).setValues([updates]);
+  sheet.getRange(row, 1, 1, 15).setValues([updates]);
 
   return createResponse({
     success: true,
@@ -580,13 +667,13 @@ function getSummary(data) {
   // Apply view filter
   const currentUser = data.currentUser;
 
-  // Apply user access control - only show own transactions and shared
-  transactions = transactions.filter(
-    (t) => t.person === currentUser || t.person === "shared"
-  );
-
-  // Apply view filter (only if user is viewing their own or shared)
-  if (data.view && data.view !== "geral" && data.view !== currentUser) {
+  if (data.view === "geral") {
+    // Show only shared transactions
+    transactions = transactions.filter((t) => t.person === "shared");
+  } else if (data.view === currentUser || !data.view) {
+    // Show only user's own transactions (NOT shared)
+    transactions = transactions.filter((t) => t.person === currentUser);
+  } else {
     // User trying to view someone else's data - return empty
     transactions = [];
   }
@@ -730,4 +817,194 @@ function createResponse(data, status = 200) {
   // Note: Apps Script doesn't support custom headers in Web Apps
   // But deploying as "Anyone" should allow cross-origin requests
   return output;
+}
+
+// ==========================================
+// Credit Cards Management
+// ==========================================
+
+function getCardsSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(CONFIG.CARDS_SHEET);
+
+  if (!sheet) {
+    sheet = ss.insertSheet(CONFIG.CARDS_SHEET);
+    // Setup headers
+    sheet
+      .getRange(1, 1, 1, 6)
+      .setValues([
+        [
+          "ID",
+          "Nome",
+          "Dia Vencimento",
+          "Dia Fechamento",
+          "Criado Em",
+          "Atualizado Em",
+        ],
+      ]);
+    sheet.getRange(1, 1, 1, 6).setFontWeight("bold");
+  }
+
+  return sheet;
+}
+
+function getCards(data) {
+  const sheet = getCardsSheet();
+  const lastRow = sheet.getLastRow();
+
+  if (lastRow < 2) {
+    return createResponse({ cards: [] });
+  }
+
+  const range = sheet.getRange(2, 1, lastRow - 1, 6);
+  const values = range.getValues();
+
+  const cards = values
+    .map((row) => ({
+      id: row[0],
+      name: row[1],
+      dueDay: row[2],
+      closingDay: row[3],
+      createdAt: row[4],
+      updatedAt: row[5],
+    }))
+    .filter((c) => c.id);
+
+  return createResponse({ cards });
+}
+
+function createCard(data) {
+  const sheet = getCardsSheet();
+  const id = Utilities.getUuid();
+  const now = new Date().toISOString();
+
+  sheet.appendRow([id, data.name, data.dueDay, data.closingDay, now, now]);
+
+  return createResponse({
+    success: true,
+    card: {
+      id,
+      name: data.name,
+      dueDay: data.dueDay,
+      closingDay: data.closingDay,
+      createdAt: now,
+      updatedAt: now,
+    },
+  });
+}
+
+function updateCard(data) {
+  const sheet = getCardsSheet();
+  const row = findRowById(sheet, data.id);
+
+  if (row === -1) {
+    return createResponse({ error: "Card not found" }, 404);
+  }
+
+  const now = new Date().toISOString();
+
+  sheet
+    .getRange(row, 2, 1, 5)
+    .setValues([
+      [
+        data.name,
+        data.dueDay,
+        data.closingDay,
+        sheet.getRange(row, 5).getValue(),
+        now,
+      ],
+    ]);
+
+  return createResponse({
+    success: true,
+    message: "Card updated successfully",
+  });
+}
+
+function deleteCard(data) {
+  const sheet = getCardsSheet();
+  const row = findRowById(sheet, data.id);
+
+  if (row === -1) {
+    return createResponse({ error: "Card not found" }, 404);
+  }
+
+  sheet.deleteRow(row);
+  return createResponse({
+    success: true,
+    message: "Card deleted successfully",
+  });
+}
+
+// ==========================================
+// Installment Calculation
+// ==========================================
+
+/**
+ * Calculate the due date for an installment based on card's closing day
+ * @param {Date} purchaseDate - Date of purchase
+ * @param {number} closingDay - Day of month when card closes
+ * @param {number} installmentNumber - Which installment (0-based)
+ * @returns {string} Due date in YYYY-MM-DD format
+ */
+function calculateInstallmentDate(purchaseDate, closingDay, installmentNumber) {
+  const date = new Date(purchaseDate);
+  const purchaseDay = date.getDate();
+
+  // If purchase is after closing day, it goes to next month's invoice
+  let monthsToAdd = installmentNumber;
+  if (purchaseDay > closingDay) {
+    monthsToAdd += 1;
+  }
+
+  // Add months
+  date.setMonth(date.getMonth() + monthsToAdd);
+
+  // Set to closing day
+  date.setDate(closingDay);
+
+  return Utilities.formatDate(date, Session.getScriptTimeZone(), "yyyy-MM-dd");
+}
+
+/**
+ * Create installment transactions
+ * @param {object} data - Transaction data with installment info
+ * @param {object} card - Card data with closing day
+ * @returns {Array} Array of created transaction IDs
+ */
+function createInstallmentTransactions(data, card) {
+  const sheet = getSheet();
+  const installments = data.installments;
+  const amountPerInstallment = data.amount / installments;
+  const createdIds = [];
+
+  for (let i = 0; i < installments; i++) {
+    const id = Utilities.getUuid();
+    const now = new Date().toISOString();
+    const dueDate = calculateInstallmentDate(data.dueDate, card.closingDay, i);
+
+    const description = `${data.description} (${i + 1}/${installments})`;
+
+    sheet.appendRow([
+      id,
+      description,
+      amountPerInstallment,
+      data.type,
+      data.person,
+      data.category || "",
+      dueDate,
+      data.status || "pending",
+      data.notes || "",
+      false, // isRecurring
+      now,
+      now,
+      card.id, // cardId
+      i + 1, // currentInstallment
+      installments, // totalInstallments
+    ]);
+
+    createdIds.push(id);
+  }
+
+  return createdIds;
 }

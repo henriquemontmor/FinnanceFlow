@@ -110,6 +110,41 @@ const API = {
   async getSummary(filters = {}) {
     return await this.request("getSummary", filters);
   },
+
+  // ==========================================
+  // Credit Cards API
+  // ==========================================
+
+  /**
+   * Get all cards
+   */
+  async getCards() {
+    return await this.request("getCards");
+  },
+
+  /**
+   * Create new card
+   */
+  async createCard(cardData) {
+    return await this.request("createCard", cardData);
+  },
+
+  /**
+   * Update card
+   */
+  async updateCard(id, cardData) {
+    return await this.request("updateCard", {
+      id,
+      ...cardData,
+    });
+  },
+
+  /**
+   * Delete card
+   */
+  async deleteCard(id) {
+    return await this.request("deleteCard", { id });
+  },
 };
 
 // Make API available globally
