@@ -26,8 +26,8 @@ const CONFIG = {
     usuario2: "sua-senha-segura-aqui",  // ⚠️ ALTERE ISSO!
   },
   
-  // Token expiration in milliseconds (24 hours)
-  TOKEN_EXPIRATION: 24 * 60 * 60 * 1000,
+  // Token expiration in milliseconds (72 hours)
+  TOKEN_EXPIRATION: 72 * 60 * 60 * 1000,
   
   // ==========================================
   // 🌐 CONFIGURE SUAS ORIGENS PERMITIDAS

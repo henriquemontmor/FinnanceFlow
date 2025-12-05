@@ -2,8 +2,23 @@
 // FinnanceFlow - Dashboard
 // ==========================================
 
-// Require authentication
-Auth.requireAuth();
+// Require authentication and validate token
+(async function validateSession() {
+  const token = Auth.getToken();
+  if (!token) {
+    window.location.href = "index.html";
+    return;
+  }
+
+  // Validar se o token ainda é válido
+  const isValid = await Auth.validateToken(token);
+  if (!isValid) {
+    Auth.removeToken();
+    alert("Sessão expirada. Faça login novamente.");
+    window.location.href = "index.html";
+    return;
+  }
+})();
 
 // Get current user data
 const currentUserData = Auth.getUserData();

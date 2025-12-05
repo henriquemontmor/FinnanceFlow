@@ -12,7 +12,21 @@ if (!CONFIG.API_URL || CONFIG.API_URL.includes("YOUR_DEPLOYMENT_ID")) {
 }
 
 // Check if user is already logged in
-Auth.redirectIfAuthenticated();
+(async function checkExistingSession() {
+  const token = Auth.getToken();
+  if (token) {
+    // Validar se o token ainda é válido
+    const isValid = await Auth.validateToken(token);
+    if (isValid) {
+      // Token válido, redirecionar para dashboard
+      window.location.href = "dashboard.html";
+      return;
+    } else {
+      // Token expirado, limpar
+      Auth.removeToken();
+    }
+  }
+})();
 
 // Get form elements
 const loginForm = document.getElementById("loginForm");
