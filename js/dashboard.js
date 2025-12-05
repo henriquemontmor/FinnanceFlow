@@ -431,9 +431,10 @@ function openModal(type = "expense") {
   transactionForm.reset();
   document.getElementById("transactionId").value = "";
   document.getElementById("type").value = type;
-  document.getElementById("dueDate").value = new Date()
-    .toISOString()
-    .split("T")[0];
+
+  // Set current date as default, user can change it
+  const today = new Date().toISOString().split("T")[0];
+  document.getElementById("dueDate").value = today;
 
   modalTitle.textContent = type === "expense" ? "Nova Despesa" : "Nova Receita";
   modal.classList.add("active");
@@ -498,11 +499,12 @@ function formatCurrency(value) {
 
 function formatDate(dateString) {
   const date = new Date(dateString + "T00:00:00");
-  return new window.Intl.DateFormat(CONFIG.LOCALE, {
+  const formatter = new Intl.DateTimeFormat(CONFIG.LOCALE, {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
-  }).format(date);
+  });
+  return formatter.format(date);
 }
 
 function showLoading() {

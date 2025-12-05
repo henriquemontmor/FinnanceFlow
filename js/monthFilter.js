@@ -80,7 +80,11 @@ function changeMonth(delta) {
   }
 
   updateMonthYearDisplay();
-  loadDashboardData();
+
+  // Reload dashboard with new month/year
+  if (typeof loadDashboardData === "function") {
+    loadDashboardData();
+  }
 }
 
 function resetToCurrentMonth() {
@@ -89,7 +93,11 @@ function resetToCurrentMonth() {
   currentYear = now.getFullYear();
 
   updateMonthYearDisplay();
-  loadDashboardData();
+
+  // Reload dashboard with current month/year
+  if (typeof loadDashboardData === "function") {
+    loadDashboardData();
+  }
 }
 
 function updateMonthYearDisplay() {
