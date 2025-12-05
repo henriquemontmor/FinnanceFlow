@@ -778,14 +778,18 @@ function getSummary(data) {
     // CARTÃO
     if (t.type === "cartao") {
       // DÉBITO: diminui do saldo (como despesa normal), NÃO aparece em totalCard
-      if (t.cardTransactionType === "debit") {
+      // Mas APENAS se estiver pago (débito é pago na hora)
+      if (t.cardTransactionType === "debit" && t.status === "paid") {
         summary.totalExpense += t.amount;
-        if (t.status === "pending") {
-          summary.totalPending += t.amount;
-        }
       }
+      
+      // Pendentes no débito contam como pendente
+      if (t.cardTransactionType === "debit" && t.status === "pending") {
+        summary.totalPending += t.amount;
+      }
+      
       // CRÉDITO: não afeta o saldo, APENAS aparece em totalCard
-      else if (t.cardTransactionType === "credit") {
+      if (t.cardTransactionType === "credit") {
         summary.totalCard += t.amount;
       }
 
@@ -806,9 +810,13 @@ function getSummary(data) {
     if (t.type === "income") {
       summary.totalIncome += t.amount;
     } else if (t.type === "expense") {
-      summary.totalExpense += t.amount;
+      // APENAS despesas PAGAS diminuem do saldo
+      if (t.status === "paid") {
+        summary.totalExpense += t.amount;
+      }
     }
 
+    // Todas as pendentes (exceto crédito) contam em totalPending
     if (t.status === "pending") {
       summary.totalPending += t.amount;
     }
