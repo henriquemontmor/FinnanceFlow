@@ -20,8 +20,8 @@ jobs:
       - name: Create config.js from template
         run: |
           cp js/config.js.template js/config.js
-          sed -i "s|SEU_SCRIPT_ID_AQUI|${{ secrets.APPS_SCRIPT_URL }}|g" js/config.js
-          echo "✅ config.js criado com API_URL segura"
+          sed -i "s|https://seu-worker.workers.dev|${{ secrets.CLOUDFLARE_WORKER_URL }}|g" js/config.js
+          echo "✅ config.js criado com Cloudflare Worker URL"
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
